@@ -27,18 +27,14 @@ func handlerAddFeed(s *state, cmd command) error {
 
 	name := cmd.arguments[0]
 	url := cmd.arguments[1]
-	id := uuid.New()
-	user_id := user.ID
-	created_at := time.Now()
-	updated_at := time.Now()
 
 	feed, err := s.db.CreateFeed(context.Background(), database.CreateFeedParams{
-		ID:        id,
-		CreatedAt: created_at,
-		UpdatedAt: updated_at,
+		ID:        uuid.New(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 		Name:      name,
 		Url:       url,
-		UserID:    user_id,
+		UserID:    user.ID,
 	})
 
 	if err != nil {
@@ -52,6 +48,17 @@ func handlerAddFeed(s *state, cmd command) error {
 	fmt.Printf(" * UserID:    %s\n", feed.UserID)
 	fmt.Printf(" * CreatedAt: %s\n", feed.CreatedAt)
 	fmt.Printf(" * UpdatedAt: %s\n", feed.UpdatedAt)
+
+	_, err = s.db.CreateFeedFollow(context.Background(), database.CreateFeedFollowParams{
+		ID:        uuid.New(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		UserID:    user.ID,
+		FeedID:    feed.ID,
+	})
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
