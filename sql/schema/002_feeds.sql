@@ -6,7 +6,8 @@ CREATE TABLE
         url TEXT NOT NULL UNIQUE,
         user_id UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
         created_at TIMESTAMP NOT NULL,
-        updated_at TIMESTAMP NOT NULL
+        updated_at TIMESTAMP NOT NULL,
+        last_fetched_at TIMESTAMP
     );
 
 -- +goose Down
