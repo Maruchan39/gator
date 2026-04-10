@@ -10,16 +10,10 @@ import (
 	"github.com/google/uuid"
 )
 
-func handlerFollow(s *state, cmd command) error {
-	username := s.config.CurrentUserName
+func handlerFollow(s *state, cmd command, user database.User) error {
 
 	if len(cmd.arguments) == 0 {
 		return fmt.Errorf("feed url required")
-	}
-
-	user, err := s.db.GetUser(context.Background(), username)
-	if err != nil {
-		return err
 	}
 
 	feed, err := s.db.GetFeedByUrl(context.Background(), cmd.arguments[0])
@@ -45,7 +39,7 @@ func handlerFollow(s *state, cmd command) error {
 	}
 
 	fmt.Printf("* %s\n", feedFollow.FeedName)
-	fmt.Printf("* %s\n", username)
+	fmt.Printf("* %s\n", user.Name)
 
 	return nil
 }
