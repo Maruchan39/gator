@@ -4,12 +4,16 @@ import (
 	"context"
 	"database/sql"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"gator/internal/database"
 	"html"
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 func handlerAgg(s *state, cmd command) error {
@@ -26,22 +30,6 @@ func handlerAgg(s *state, cmd command) error {
 	for ; ; <-ticker.C {
 		scrapeFeeds(s)
 	}
-
-	// rssFeed, err := fetchFeed(context.Background(), "https://www.wagslane.dev/index.xml")
-	// if err != nil {
-	// 	return err
-	// }
-
-	// rssFeed.Channel.Title = html.UnescapeString(rssFeed.Channel.Title)
-	// rssFeed.Channel.Description = html.UnescapeString(rssFeed.Channel.Description)
-
-	// for i, item := range rssFeed.Channel.Item {
-	// 	rssFeed.Channel.Item[i].Title = html.UnescapeString(item.Title)
-	// 	rssFeed.Channel.Item[i].Description = html.UnescapeString(item.Description)
-	// }
-
-	// fmt.Printf("%+v\n", rssFeed)
-	// return nil
 }
 
 func fetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error) {
@@ -73,6 +61,7 @@ func fetchFeed(ctx context.Context, feedURL string) (*RSSFeed, error) {
 }
 
 func scrapeFeeds(s *state) error {
+	fmt.Println("Scraping feeds...")
 	nextFeedToFetch, err := s.db.GetNextFeedToFetch(context.Background())
 	if err != nil {
 		return err
@@ -90,16 +79,31 @@ func scrapeFeeds(s *state) error {
 
 	for i, item := range rssFeed.Channel.Item {
 		rssFeed.Channel.Item[i].Title = html.UnescapeString(item.Title)
+		rssFeed.Channel.Item[i].Description = html.UnescapeString(item.Description)
+
+		publishedAt := sql.NullTime{}
+		if t, err := time.Parse(time.RFC1123, item.PubDate); err == nil {
+			publishedAt = sql.NullTime{Time: t, Valid: true}
+		}
+
+		_, err := s.db.CreatePost(context.Background(), database.CreatePostParams{
+			ID:          uuid.New(),
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+			Url:         nextFeedToFetch.Url,
+			FeedID:      nextFeedToFetch.ID,
+			Title:       sql.NullString{String: rssFeed.Channel.Item[i].Title, Valid: true},
+			Description: sql.NullString{String: rssFeed.Channel.Item[i].Description, Valid: true},
+			PublishedAt: publishedAt,
+		})
+		if err != nil {
+			var pqErr *pq.Error
+			if errors.As(err, &pqErr) && pqErr.Code == "23505" {
+				continue
+			}
+			return err
+		}
 	}
 
-	rssFeed.Channel.Title = html.UnescapeString(rssFeed.Channel.Title)
-	// rssFeed.Channel.Description = html.UnescapeString(rssFeed.Channel.Description)
-
-	for i, item := range rssFeed.Channel.Item {
-		rssFeed.Channel.Item[i].Title = html.UnescapeString(item.Title)
-		// rssFeed.Channel.Item[i].Description = html.UnescapeString(item.Description)
-	}
-
-	fmt.Printf("%+v\n", rssFeed)
 	return nil
 }
